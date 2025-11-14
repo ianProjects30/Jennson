@@ -21,6 +21,19 @@ def load_user(user_id):
         return User(user_id)
     return None
 
+@app.route("/", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+        if email in users and users[email]["password"] == password:
+            user = User(email)
+            login_user(user)
+            flash("Logged in successfully!", "success")
+            return redirect(url_for("dashboard"))
+        flash("Invalid credentials", "danger")
+    return render_template("login.html")
+
 # Login Page
 @app.route("/login", methods=["GET", "POST"])
 def login():
