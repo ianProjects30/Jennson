@@ -24,10 +24,6 @@ def load_user(user_id):
         return User(user_id)
     return None
 
-
-# --------------------------
-# LOGIN
-# --------------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -43,25 +39,18 @@ def login():
 
     return render_template("login.html")
 
-
-# --------------------------
-# DASHBOARD (CRUD + TABLE VIEW)
-# --------------------------
 @app.route("/dashboard", methods=["GET", "POST"])
 @login_required
 def dashboard():
 
-    # Load tables
     try:
         tables_resp = supabase.rpc("get_tables").execute()
         tables_list = [t["table_name"] for t in tables_resp.data]
     except:
         tables_list = ["users"]
 
-    # Selected table
     table_name = request.args.get("table") or tables_list[0]
 
-    # CRUD handling
     if request.method == "POST":
         action = request.form.get("action")
         row_id = request.form.get("row_id")
@@ -82,7 +71,6 @@ def dashboard():
 
         return redirect(url_for("dashboard", table=table_name))
 
-    # Fetch table data
     try:
         response = supabase.table(table_name).select("*").execute()
         table_data = response.data
@@ -98,9 +86,6 @@ def dashboard():
     )
 
 
-# --------------------------
-# EXPORT TO EXCEL
-# --------------------------
 @app.route("/export_excel")
 @login_required
 def export_excel():
@@ -127,9 +112,6 @@ def export_excel():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# ------------------------------------
-# EXPORT FILTERED (OPTION A - MANUAL)
-# ------------------------------------
 @app.route("/export_excel_filtered_manual", methods=["POST"])
 @login_required
 def export_excel_filtered_manual():
@@ -164,10 +146,6 @@ def export_excel_filtered_manual():
     )
 
 
-
-# --------------------------
-# LOGOUT
-# --------------------------
 @app.route("/logout")
 @login_required
 def logout():

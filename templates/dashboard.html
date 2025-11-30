@@ -1,149 +1,409 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="container-fluid py-4">
+    
+    <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
+        <h2 class="text-dark fw-bold m-0">
+            <i class="bi bi-bar-chart-line-fill text-primary me-2"></i> Table Dashboard 
+            <small class="text-muted fs-5">/ {{ table_name | title }}</small>
+        </h2>
+        <span class="badge bg-secondary-subtle text-secondary-emphasis py-2 px-3 shadow-sm">
+            Total Rows: <span id="total-rows-count">{{ table_data|length if table_data else 0 }}</span>
+        </span>
+    </div>
 
-<h2>Dashboard</h2>
+    <div class="card bg-white border-0 shadow-lg mb-4">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center">
+                    <label for="tableSelect" class="form-label me-3 mb-0 fw-bold text-muted">
+                        <i class="bi bi-database me-1"></i> Data Source:
+                    </label>
+                    <form method="get" class="d-flex">
+                        <select id="tableSelect" class="form-select form-select-lg border-primary border-2 w-auto" name="table" onchange="this.form.submit()">
+                            {% for t in tables_list %}
+                                <option value="{{ t }}" {% if t == table_name %}selected{% endif %}>
+                                    {{ t | title }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
 
-    <!-- Table switch -->
-    <form method="get" class="d-flex">
-        <select class="form-select me-2" name="table" onchange="this.form.submit()">
-            {% for t in tables_list %}
-                <option value="{{ t }}" {% if t == table_name %}selected{% endif %}>
-                    {{ t }}
-                </option>
-            {% endfor %}
-        </select>
-    </form>
+                <form id="exportForm" method="POST"
+                    action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
+                    <input type="hidden" name="filtered_rows" id="filtered_rows">
+                    <button type="submit" class="btn btn-lg btn-success d-flex align-items-center shadow-sm">
+                        <i class="bi bi-file-earmark-arrow-down-fill me-2"></i> Export Filtered Data
+                    </button>
+                </form>
 
-    <!-- EXPORT FILTERED BUTTON (Option A) -->
-    <form id="exportForm" method="POST"
-          action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
-        <input type="hidden" name="filtered_rows" id="filtered_rows">
-        <button class="btn btn-success">Export Filtered</button>
-    </form>
+            </div>
+        </div>
+    </div>
+    <div class="card bg-white shadow-lg mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-primary fw-bold mb-3">
+                <i class="bi bi-sliders me-2"></i> Interaction Controls
+            </h5>
+            <div class="row align-items-center">
+                
+                <div class="col-md-8 mb-3 mb-md-0">
+                    <div class="input-group input-group-lg">
+                        <select id="columnSelect" class="form-select w-auto border-secondary">
+                            {% for key in table_data[0].keys() %}
+                                <option value="{{ loop.index0 }}">{{ key | title }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" id="columnSearch" class="form-control"
+                                    placeholder="Search in selected column (Type and press Enter or click away)...">
+                        <span class="input-group-text bg-light text-secondary"><i class="bi bi-search"></i></span>
+                    </div>
+                </div>
 
-</div>
+                <div class="col-md-4 d-flex align-items-center justify-content-md-end">
+                    <label for="rowsPerPage" class="form-label me-3 mb-0 fw-bold text-secondary-emphasis">Rows per page:</label>
+                    <select id="rowsPerPage" class="form-select w-auto border-secondary">
+                        <option value="10" selected>10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="0">All</option>
+                    </select>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+    {% if table_data %}
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-primary text-white py-3">
+            <h5 class="mb-0"><i class="bi bi-table me-2"></i> Current Data: {{ table_name | title }}</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table id="dynamicTable" class="table table-striped table-hover mb-0">
+                    <thead class="table-light"> <tr>
+                            {% for key in table_data[0].keys() %}
+                                <th class="sortable-header text-primary" data-column-index="{{ loop.index0 }}" data-sort-order="asc">
+                                    {{ key | title }}
+                                    <span class="sort-icon text-secondary"><i class="bi bi-arrow-down-up"></i></span> 
+                                </th>
+                            {% endfor %}
+                            <th class="text-center text-primary">Actions</th>
+                        </tr>
+                    </thead>
 
+                    <tbody>
 
-<!-- COLUMN-BASED SEARCH -->
-<div class="d-flex mb-3">
-    <select id="columnSelect" class="form-select w-auto me-2">
-        {% for key in table_data[0].keys() %}
-            <option value="{{ loop.index0 }}">{{ key }}</option>
-        {% endfor %}
-    </select>
+                        {% for row in table_data %}
+                        <tr class="data-row">
+                            <form method="POST">
+                                <input type="hidden" name="row_id" value="{{ row['id'] }}">
 
-    <input type="text" id="columnSearch" class="form-control w-50"
-           placeholder="Search in selected column...">
-</div>
+                                {% for key, value in row.items() %}
+                                    <td>
+                                        <input type="text" name="{{ key }}" value="{{ value }}"
+                                                class="form-control form-control-sm border-0 bg-transparent text-dark">
+                                    </td>
+                                {% endfor %}
 
-{% if table_data %}
-<table id="dynamicTable" class="table table-bordered table-hover">
-    <thead class="table-dark">
-        <tr>
-            {% for key in table_data[0].keys() %}
-                <th>{{ key }}</th>
-            {% endfor %}
-            <th>Actions</th>
-        </tr>
-    </thead>
+                                <td class="text-center">
+                                    <button name="action" value="update"
+                                            class="btn btn-sm btn-outline-success me-1" title="Save Changes">
+                                            <i class="bi bi-save"></i>
+                                    </button>
+                                    <button name="action" value="delete"
+                                            class="btn btn-sm btn-outline-danger" title="Delete Row"
+                                            onclick="return confirm('Are you sure you want to delete this row?')">
+                                            <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </form>
+                        </tr>
+                        {% endfor %}
 
-    <tbody>
+                        <tr id="addRow" class="table-primary border-top border-primary border-2">
+                            <form method="POST">
+                                {% for key in table_data[0].keys() %}
+                                    <td>
+                                        <input type="text" name="{{ key }}"
+                                                class="form-control form-control-sm border-secondary">
+                                    </td>
+                                {% endfor %}
+                                <td class="text-center">
+                                    <button name="action" value="add"
+                                            class="btn btn-primary btn-sm w-75 shadow-sm">
+                                            <i class="bi bi-plus-circle me-1"></i> Add New
+                                    </button>
+                                </td>
+                            </form>
+                        </tr>
 
-        <!-- Existing rows -->
-        {% for row in table_data %}
-        <tr>
-            <form method="POST">
-                <input type="hidden" name="row_id" value="{{ row['id'] }}">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
-                {% for key, value in row.items() %}
-                    <td>
-                        <input type="text" name="{{ key }}" value="{{ value }}"
-                               class="form-control form-control-sm">
-                    </td>
-                {% endfor %}
+    <nav aria-label="Table Pagination" class="mt-4">
+        <ul class="pagination justify-content-center shadow-sm" id="pagination-controls">
+            </ul>
+    </nav>
 
-                <td>
-                    <button name="action" value="update"
-                            class="btn btn-success btn-sm">Save</button>
-                    <button name="action" value="delete"
-                            class="btn btn-danger btn-sm"
-                            onclick="return confirm('Delete this row?')">Delete</button>
-                </td>
-            </form>
-        </tr>
-        {% endfor %}
+    {% else %}
+    <div class="alert alert-warning shadow-sm" role="alert">
+        <i class="bi bi-info-circle me-2"></i> No data found for the table: <strong>{{ table_name }}</strong>.
+    </div>
+    {% endif %}
 
-        <!-- Add new row -->
-        <tr>
-            <form method="POST">
-                {% for key in table_data[0].keys() %}
-                    <td>
-                        <input type="text" name="{{ key }}"
-                               class="form-control form-control-sm">
-                    </td>
-                {% endfor %}
-                <td>
-                    <button name="action" value="add"
-                            class="btn btn-primary btn-sm">Add</button>
-                </td>
-            </form>
-        </tr>
+    <style>
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s;
+        }
+        .sortable-header:hover {
+            color: #0056b3 !important; /* Slightly darker primary color on hover */
+        }
+        .sort-icon {
+            margin-left: 5px;
+            font-size: 0.85em; /* Make the icons slightly smaller than the text */
+        }
+    </style>
 
-    </tbody>
-</table>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Global state variables for pagination/sorting
+            let currentPage = 1;
+            let rowsPerPage = parseInt($("#rowsPerPage").val());
+            const tableBody = $("#dynamicTable tbody");
+            let allDataRows = tableBody.find("tr.data-row"); 
+            
+            let sortColumn = 0; 
+            let sortOrder = 'asc'; 
 
-{% else %}
-<p>No data found.</p>
-{% endif %}
+            // Initialize total row count for the badge
+            $('#total-rows-count').text(allDataRows.length);
 
+            // --- Core Display and Pagination Functions ---
 
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+            function displayRows(page, filteredRows) {
+                rowsPerPage = parseInt($("#rowsPerPage").val());
+                allDataRows.hide(); 
 
-<script>
-$(document).ready(function() {
-
-    // MANUAL column search (Option A)
-    $("#columnSearch").on("keyup", function() {
-        let colIndex = parseInt($("#columnSelect").val());
-        let searchValue = this.value.toLowerCase();
-
-        $("#dynamicTable tbody tr").each(function() {
-            let cellInput = $(this).find("td").eq(colIndex).find("input");
-            if (cellInput.length) {
-                let cellVal = cellInput.val().toLowerCase();
-                if (cellVal.includes(searchValue)) {
-                    $(this).show();
-                } else {
-                    $(this).hide();
+                if (rowsPerPage === 0) {
+                    filteredRows.show();
+                    $("#pagination-controls").empty();
+                    return;
                 }
+
+                const startIndex = (page - 1) * rowsPerPage;
+                const endIndex = startIndex + rowsPerPage;
+                filteredRows.slice(startIndex, endIndex).show();
             }
-        });
-    });
 
-    // EXPORT ONLY VISIBLE ROWS (Option A)
-    $("#exportForm").on("submit", function() {
-        let filtered = [];
+            function setupPagination(filteredRows) {
+                rowsPerPage = parseInt($("#rowsPerPage").val());
+                const totalRows = filteredRows.length;
+                
+                // Update the badge with the current number of filtered rows
+                $('#total-rows-count').text(totalRows);
 
-        $("#dynamicTable tbody tr:visible").each(function() {
-            let rowData = {};
+                if (rowsPerPage === 0 || totalRows <= rowsPerPage) {
+                    $("#pagination-controls").empty();
+                    return;
+                }
 
-            $(this).find("input").each(function() {
-                rowData[$(this).attr("name")] = $(this).val();
+                const totalPages = Math.ceil(totalRows / rowsPerPage);
+                const paginationContainer = $("#pagination-controls");
+                paginationContainer.empty();
+
+                // Generate Previous button
+                paginationContainer.append(`
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}" data-page="prev">
+                        <a class="page-link" href="#" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                `);
+
+                // Generate Page number buttons
+                for (let i = 1; i <= totalPages; i++) {
+                    paginationContainer.append(`
+                        <li class="page-item ${i === currentPage ? 'active' : ''}" data-page="${i}">
+                            <a class="page-link" href="#">${i}</a>
+                        </li>
+                    `);
+                }
+
+                // Generate Next button
+                paginationContainer.append(`
+                    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}" data-page="next">
+                        <a class="page-link" href="#" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                `);
+
+                // Attach click handlers to page links
+                paginationContainer.find("li:not(.disabled)").off("click").on("click", function(e) {
+                    e.preventDefault();
+                    const pageAction = $(this).data('page');
+                    let newPage = currentPage;
+
+                    if (pageAction === 'prev' && currentPage > 1) {
+                        newPage = currentPage - 1;
+                    } else if (pageAction === 'next' && currentPage < totalPages) {
+                        newPage = currentPage + 1;
+                    } else if (typeof pageAction === 'number') {
+                        newPage = pageAction;
+                    }
+
+                    if (newPage !== currentPage) {
+                        currentPage = newPage;
+                        renderTable(); 
+                    }
+                });
+            }
+
+            // --- Sorting Function ---
+            function getCellValue(row, index) {
+                return $(row).children('td').eq(index).find('input').val() || '';
+            }
+
+            function sortTable(columnIndex, order) {
+                const rows = allDataRows.get(); 
+
+                rows.sort(function(a, b) {
+                    const valA = getCellValue(a, columnIndex).toLowerCase();
+                    const valB = getCellValue(b, columnIndex).toLowerCase();
+                    
+                    let comparison = 0;
+                    if (valA > valB) {
+                        comparison = 1;
+                    } else if (valA < valB) {
+                        comparison = -1;
+                    }
+
+                    return order === 'desc' ? (comparison * -1) : comparison;
+                });
+
+                $.each(rows, function(index, row) {
+                    tableBody.append(row);
+                });
+
+                allDataRows = tableBody.find("tr.data-row");
+
+                $('.sortable-header').find('.sort-icon').html('<i class="bi bi-arrow-down-up"></i>');
+                const currentHeader = $(`[data-column-index=${columnIndex}]`);
+                currentHeader.find('.sort-icon').html(
+                    order === 'asc' ? '<i class="bi bi-sort-up"></i>' : '<i class="bi bi-sort-down"></i>'
+                );
+
+                currentPage = 1;
+                renderTable();
+            }
+
+            // --- Main Render Function ---
+
+            function renderTable() {
+                let searchValue = $("#columnSearch").val().toLowerCase();
+                let colIndex = parseInt($("#columnSelect").val());
+                let filteredRows = $(); 
+
+                // 1. Filter rows based on search
+                allDataRows.each(function() {
+                    let $row = $(this);
+                    let cellInput = $row.find("td").eq(colIndex).find("input");
+                    
+                    if (cellInput.length) {
+                        let cellVal = cellInput.val().toLowerCase();
+                        if (cellVal.includes(searchValue)) {
+                            filteredRows = filteredRows.add($row);
+                        }
+                    }
+                });
+
+                // Reset page if current page is now out of bounds
+                const totalFilteredPages = rowsPerPage > 0 ? Math.ceil(filteredRows.length / rowsPerPage) : 1;
+                if (currentPage > totalFilteredPages && totalFilteredPages > 0) {
+                    currentPage = totalFilteredPages;
+                } else if (currentPage === 0) {
+                    currentPage = 1;
+                }
+
+                // 2. Display the current page of the filtered rows
+                displayRows(currentPage, filteredRows);
+                
+                // 3. Setup the pagination controls
+                setupPagination(filteredRows);
+                
+                // Ensure the Add New Row is always visible
+                $("#addRow").show();
+            }
+
+
+            // --- Event Handlers ---
+
+            // 1. Column Header Click Handler
+            $("#dynamicTable thead").on("click", ".sortable-header", function() {
+                const newColumn = parseInt($(this).data('column-index'));
+                let newOrder = $(this).data('sort-order');
+
+                if (newColumn === sortColumn) {
+                    newOrder = (newOrder === 'asc' ? 'desc' : 'asc');
+                } else {
+                    newOrder = 'asc';
+                }
+
+                sortColumn = newColumn;
+                sortOrder = newOrder;
+                $(this).data('sort-order', newOrder);
+
+                sortTable(sortColumn, sortOrder);
             });
 
-            // Only push rows that actually contain inputs (avoid header row)
-            if (Object.keys(rowData).length > 0) {
-                filtered.push(rowData);
-            }
+
+            // 2. Initial Rendering (including default sort)
+            renderTable();
+
+            // 3. Handle column search changes
+            $("#columnSearch, #columnSelect").on("keyup change", function() {
+                currentPage = 1;
+                renderTable();
+            });
+
+            // 4. Handle rows per page selector change
+            $("#rowsPerPage").on("change", function() {
+                rowsPerPage = parseInt($(this).val());
+                currentPage = 1;
+                renderTable();
+            });
+
+            // 5. EXPORT ONLY VISIBLE (FILTERED) ROWS
+            $("#exportForm").on("submit", function() {
+                let filtered = [];
+
+                $("#dynamicTable tbody tr.data-row").each(function() {
+                    // Only collect rows that are currently visible (filtered by search)
+                    if ($(this).css('display') !== 'none') {
+                        let rowData = {};
+
+                        $(this).find("input").each(function() {
+                            rowData[$(this).attr("name")] = $(this).val();
+                        });
+
+                        if (rowData.row_id) { 
+                            filtered.push(rowData);
+                        }
+                    }
+                });
+
+                $("#filtered_rows").val(JSON.stringify(filtered));
+            });
         });
-
-        $("#filtered_rows").val(JSON.stringify(filtered));
-    });
-
-});
-</script>
-
-{% endblock %}
+    </script>
+    {% endblock %}
