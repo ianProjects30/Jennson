@@ -1,22 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Admin Dashboard</h2>
+
+<h2>Dashboard</h2>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <!-- Dropdown to switch table -->
+
+    <!-- Table switch -->
     <form method="get" class="d-flex">
         <select class="form-select me-2" name="table" onchange="this.form.submit()">
             {% for t in tables_list %}
-                <option value="{{ t }}" {% if t == table_name %}selected{% endif %}>{{ t }}</option>
+                <option value="{{ t }}" {% if t == table_name %}selected{% endif %}>
+                    {{ t }}
+                </option>
             {% endfor %}
         </select>
-        <noscript><button class="btn btn-primary">Switch</button></noscript>
     </form>
-    <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+
+    <!-- EXPORT FILTERED BUTTON (Option A) -->
+    <form id="exportForm" method="POST"
+          action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
+        <input type="hidden" name="filtered_rows" id="filtered_rows">
+        <button class="btn btn-success">Export Filtered</button>
+    </form>
+
+</div>
+
+
+<!-- COLUMN-BASED SEARCH -->
+<div class="d-flex mb-3">
+    <select id="columnSelect" class="form-select w-auto me-2">
+        {% for key in table_data[0].keys() %}
+            <option value="{{ loop.index0 }}">{{ key }}</option>
+        {% endfor %}
+    </select>
+
+    <input type="text" id="columnSearch" class="form-control w-50"
+           placeholder="Search in selected column...">
 </div>
 
 {% if table_data %}
-<table id="dynamicTable" class="table table-striped table-hover table-bordered">
+<table id="dynamicTable" class="table table-bordered table-hover">
     <thead class="table-dark">
         <tr>
             {% for key in table_data[0].keys() %}
@@ -25,19 +48,28 @@
             <th>Actions</th>
         </tr>
     </thead>
+
     <tbody>
+
+        <!-- Existing rows -->
         {% for row in table_data %}
         <tr>
             <form method="POST">
                 <input type="hidden" name="row_id" value="{{ row['id'] }}">
+
                 {% for key, value in row.items() %}
                     <td>
-                        <input type="text" name="{{ key }}" value="{{ value }}" class="form-control form-control-sm">
+                        <input type="text" name="{{ key }}" value="{{ value }}"
+                               class="form-control form-control-sm">
                     </td>
                 {% endfor %}
+
                 <td>
-                    <button type="submit" name="action" value="update" class="btn btn-sm btn-success mb-1">Save</button>
-                    <button type="submit" name="action" value="delete" class="btn btn-sm btn-danger" onclick="return confirm('Delete this row?')">Delete</button>
+                    <button name="action" value="update"
+                            class="btn btn-success btn-sm">Save</button>
+                    <button name="action" value="delete"
+                            class="btn btn-danger btn-sm"
+                            onclick="return confirm('Delete this row?')">Delete</button>
                 </td>
             </form>
         </tr>
@@ -47,28 +79,70 @@
         <tr>
             <form method="POST">
                 {% for key in table_data[0].keys() %}
-                    <td><input type="text" name="{{ key }}" class="form-control form-control-sm"></td>
+                    <td>
+                        <input type="text" name="{{ key }}"
+                               class="form-control form-control-sm">
+                    </td>
                 {% endfor %}
-                <td><button type="submit" name="action" value="add" class="btn btn-sm btn-primary">Add</button></td>
+                <td>
+                    <button name="action" value="add"
+                            class="btn btn-primary btn-sm">Add</button>
+                </td>
             </form>
         </tr>
+
     </tbody>
 </table>
+
 {% else %}
-<p class="text-muted">No data found in table "{{ table_name }}"</p>
+<p>No data found.</p>
 {% endif %}
 
-<!-- DataTables JS -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
 <script>
 $(document).ready(function() {
-    $('#dynamicTable').DataTable({
-        "paging": true,
-        "searching": true,
-        "ordering": true
+
+    // MANUAL column search (Option A)
+    $("#columnSearch").on("keyup", function() {
+        let colIndex = parseInt($("#columnSelect").val());
+        let searchValue = this.value.toLowerCase();
+
+        $("#dynamicTable tbody tr").each(function() {
+            let cellInput = $(this).find("td").eq(colIndex).find("input");
+            if (cellInput.length) {
+                let cellVal = cellInput.val().toLowerCase();
+                if (cellVal.includes(searchValue)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            }
+        });
     });
+
+    // EXPORT ONLY VISIBLE ROWS (Option A)
+    $("#exportForm").on("submit", function() {
+        let filtered = [];
+
+        $("#dynamicTable tbody tr:visible").each(function() {
+            let rowData = {};
+
+            $(this).find("input").each(function() {
+                rowData[$(this).attr("name")] = $(this).val();
+            });
+
+            // Only push rows that actually contain inputs (avoid header row)
+            if (Object.keys(rowData).length > 0) {
+                filtered.push(rowData);
+            }
+        });
+
+        $("#filtered_rows").val(JSON.stringify(filtered));
+    });
+
 });
 </script>
 
