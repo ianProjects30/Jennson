@@ -31,16 +31,13 @@
                     </form>
                 </div>
 
-                <form id="exportForm" method="GET" 
-    action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
-    
-    <input type="hidden" name="filter_col_index" id="filter_col_index">
-    <input type="hidden" name="filter_search_value" id="filter_search_value">
-    
-    <button type="submit" class="btn btn-lg btn-success d-flex align-items-center shadow-sm">
-        <i class="bi bi-file-earmark-arrow-down-fill me-2"></i> Export Filtered Data (Server-Side)
-    </button>
-</form>
+                <form id="exportForm" method="POST"
+                    action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
+                    <input type="hidden" name="filtered_rows" id="filtered_rows">
+                    <button type="submit" class="btn btn-lg btn-success d-flex align-items-center shadow-sm">
+                        <i class="bi bi-file-earmark-arrow-down-fill me-2"></i> Export Filtered Data
+                    </button>
+                </form>
 
             </div>
         </div>
