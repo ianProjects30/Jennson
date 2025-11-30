@@ -8,15 +8,15 @@
             <small class="text-muted fs-5">/ {{ table_name | title }}</small>
         </h2>
         <span class="badge bg-secondary-subtle text-secondary-emphasis py-2 px-3 shadow-sm">
-            Total Rows: <span id="total-rows-count">{{ table_data|length if table_data else 0 }}</span>
+            Rows Displayed: <span id="total-rows-count">{{ table_data|length if table_data else 0 }}</span>
         </span>
     </div>
 
     <div class="card bg-white border-0 shadow-lg mb-4">
         <div class="card-body py-3">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
 
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center mb-2 mb-md-0">
                     <label for="tableSelect" class="form-label me-3 mb-0 fw-bold text-muted">
                         <i class="bi bi-database me-1"></i> Data Source:
                     </label>
@@ -31,17 +31,20 @@
                     </form>
                 </div>
 
-                <form id="exportForm" method="POST"
-                    action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
-                    <input type="hidden" name="filtered_rows" id="filtered_rows">
-                    <button type="submit" class="btn btn-lg btn-success d-flex align-items-center shadow-sm">
-                        <i class="bi bi-file-earmark-arrow-down-fill me-2"></i> Export Filtered Data
-                    </button>
-                </form>
+                <!-- EXPORT FORM: Uses GET method to send filter parameters for server-side processing -->
+<form id="exportForm" method="POST"
+      action="{{ url_for('export_excel_filtered_manual', table=table_name) }}">
+    <input type="hidden" name="filter_col_index" id="filter_col_index">
+    <input type="hidden" name="filter_search_value" id="filter_search_value">
+    <button type="submit" class="btn btn-lg btn-success">Export Filtered Data</button>
+</form>
+
 
             </div>
         </div>
     </div>
+    
+    {% if table_data or table_name %}
     <div class="card bg-white shadow-lg mb-4">
         <div class="card-body">
             <h5 class="card-title text-primary fw-bold mb-3">
@@ -52,12 +55,17 @@
                 <div class="col-md-8 mb-3 mb-md-0">
                     <div class="input-group input-group-lg">
                         <select id="columnSelect" class="form-select w-auto border-secondary">
-                            {% for key in table_data[0].keys() %}
-                                <option value="{{ loop.index0 }}">{{ key | title }}</option>
-                            {% endfor %}
+                            <!-- DEFENSIVE CHECK: Prevent IndexError if table_data is empty but keys exist -->
+                            {% if table_data %}
+                                {% for key in table_data[0].keys() %}
+                                    <option value="{{ loop.index0 }}">{{ key | title }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="0" disabled>No Columns</option>
+                            {% endif %}
                         </select>
                         <input type="text" id="columnSearch" class="form-control"
-                                    placeholder="Search in selected column (Type and press Enter or click away)...">
+                                 placeholder="Search in selected column (Type and press Enter or click away)...">
                         <span class="input-group-text bg-light text-secondary"><i class="bi bi-search"></i></span>
                     </div>
                 </div>
@@ -76,7 +84,7 @@
             </div>
         </div>
     </div>
-    {% if table_data %}
+    
     <div class="card shadow-lg border-0">
         <div class="card-header bg-primary text-white py-3">
             <h5 class="mb-0"><i class="bi bi-table me-2"></i> Current Data: {{ table_name | title }}</h5>
@@ -84,23 +92,30 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table id="dynamicTable" class="table table-striped table-hover mb-0">
-                    <thead class="table-light"> <tr>
-                            {% for key in table_data[0].keys() %}
-                                <th class="sortable-header text-primary" data-column-index="{{ loop.index0 }}" data-sort-order="asc">
-                                    {{ key | title }}
-                                    <span class="sort-icon text-secondary"><i class="bi bi-arrow-down-up"></i></span> 
-                                </th>
-                            {% endfor %}
-                            <th class="text-center text-primary">Actions</th>
+                    <thead class="table-light"> 
+                        <tr>
+                            <!-- DEFENSIVE CHECK: Only loop through keys if data exists -->
+                            {% if table_data %}
+                                {% for key in table_data[0].keys() %}
+                                    <th class="sortable-header text-primary" data-column-index="{{ loop.index0 }}" data-sort-order="asc">
+                                        {{ key | title }}
+                                        <span class="sort-icon text-secondary"><i class="bi bi-arrow-down-up"></i></span> 
+                                    </th>
+                                {% endfor %}
+                                <th class="text-center text-primary">Actions</th>
+                            {% else %}
+                                <th colspan="2" class="text-center">No Columns Available</th>
+                            {% endif %}
                         </tr>
                     </thead>
 
                     <tbody>
-
+                        <!-- Data Rows -->
                         {% for row in table_data %}
                         <tr class="data-row">
                             <form method="POST">
-                                <input type="hidden" name="row_id" value="{{ row['id'] }}">
+                                <!-- Pass the primary key 'id' to the server for update/delete -->
+                                <input type="hidden" name="row_id" value="{{ row['id'] }}"> 
 
                                 {% for key, value in row.items() %}
                                     <td>
@@ -124,12 +139,18 @@
                         </tr>
                         {% endfor %}
 
+                        <!-- Add New Row -->
+                        {% if table_data %}
                         <tr id="addRow" class="table-primary border-top border-primary border-2">
                             <form method="POST">
                                 {% for key in table_data[0].keys() %}
                                     <td>
-                                        <input type="text" name="{{ key }}"
-                                                class="form-control form-control-sm border-secondary">
+                                        <!-- Don't pre-populate the 'id' field -->
+                                        {% if key == 'id' %}
+                                            <input type="text" name="{{ key }}" class="form-control form-control-sm border-secondary" disabled placeholder="Auto-generated">
+                                        {% else %}
+                                            <input type="text" name="{{ key }}" class="form-control form-control-sm border-secondary">
+                                        {% endif %}
                                     </td>
                                 {% endfor %}
                                 <td class="text-center">
@@ -140,6 +161,7 @@
                                 </td>
                             </form>
                         </tr>
+                        {% endif %}
 
                     </tbody>
                 </table>
@@ -153,11 +175,13 @@
     </nav>
 
     {% else %}
-    <div class="alert alert-warning shadow-sm" role="alert">
+    <div class="alert alert-warning shadow-sm mt-4" role="alert">
         <i class="bi bi-info-circle me-2"></i> No data found for the table: <strong>{{ table_name }}</strong>.
+        Please add a row using the "Add New" button below.
     </div>
     {% endif %}
 
+    <!-- Custom Styling -->
     <style>
         .sortable-header {
             cursor: pointer;
@@ -165,11 +189,11 @@
             transition: color 0.2s;
         }
         .sortable-header:hover {
-            color: #0056b3 !important; /* Slightly darker primary color on hover */
+            color: #0056b3 !important;
         }
         .sort-icon {
             margin-left: 5px;
-            font-size: 0.85em; /* Make the icons slightly smaller than the text */
+            font-size: 0.85em; 
         }
     </style>
 
@@ -185,7 +209,7 @@
             let sortColumn = 0; 
             let sortOrder = 'asc'; 
 
-            // Initialize total row count for the badge
+            // Initialize total row count for the badge (before filtering)
             $('#total-rows-count').text(allDataRows.length);
 
             // --- Core Display and Pagination Functions ---
@@ -231,7 +255,17 @@
                 `);
 
                 // Generate Page number buttons
-                for (let i = 1; i <= totalPages; i++) {
+                let startPage = Math.max(1, currentPage - 2);
+                let endPage = Math.min(totalPages, currentPage + 2);
+
+                if (currentPage - 2 < 1) {
+                    endPage = Math.min(totalPages, 5);
+                } else if (currentPage + 2 > totalPages) {
+                    startPage = Math.max(1, totalPages - 4);
+                }
+
+
+                for (let i = startPage; i <= endPage; i++) {
                     paginationContainer.append(`
                         <li class="page-item ${i === currentPage ? 'active' : ''}" data-page="${i}">
                             <a class="page-link" href="#">${i}</a>
@@ -271,6 +305,7 @@
 
             // --- Sorting Function ---
             function getCellValue(row, index) {
+                // Gets the value from the input field inside the table cell
                 return $(row).children('td').eq(index).find('input').val() || '';
             }
 
@@ -292,11 +327,14 @@
                 });
 
                 $.each(rows, function(index, row) {
-                    tableBody.append(row);
+                    // Prepend/Append rows to the table body (excluding the Add New row)
+                    tableBody.append(row); 
                 });
+                tableBody.append($("#addRow")); // Ensure Add Row is always last
 
                 allDataRows = tableBody.find("tr.data-row");
 
+                // Update sort icons
                 $('.sortable-header').find('.sort-icon').html('<i class="bi bi-arrow-down-up"></i>');
                 const currentHeader = $(`[data-column-index=${columnIndex}]`);
                 currentHeader.find('.sort-icon').html(
@@ -326,6 +364,10 @@
                         }
                     }
                 });
+                
+                // 2. Update hidden fields for the export form (CRITICAL!)
+                $("#filter_col_index").val($("#columnSelect").val());
+                $("#filter_search_value").val($("#columnSearch").val());
 
                 // Reset page if current page is now out of bounds
                 const totalFilteredPages = rowsPerPage > 0 ? Math.ceil(filteredRows.length / rowsPerPage) : 1;
@@ -335,13 +377,13 @@
                     currentPage = 1;
                 }
 
-                // 2. Display the current page of the filtered rows
+                // 3. Display the current page of the filtered rows
                 displayRows(currentPage, filteredRows);
                 
-                // 3. Setup the pagination controls
+                // 4. Setup the pagination controls
                 setupPagination(filteredRows);
                 
-                // Ensure the Add New Row is always visible
+                // Ensure the Add New Row is always visible if it exists
                 $("#addRow").show();
             }
 
@@ -368,7 +410,13 @@
 
 
             // 2. Initial Rendering (including default sort)
-            renderTable();
+            // Only run if there is data to process
+            if (allDataRows.length > 0) {
+                renderTable();
+            } else {
+                 setupPagination([]);
+            }
+
 
             // 3. Handle column search changes
             $("#columnSearch, #columnSelect").on("keyup change", function() {
@@ -382,28 +430,6 @@
                 currentPage = 1;
                 renderTable();
             });
-
-            // 5. EXPORT ONLY VISIBLE (FILTERED) ROWS
-            $("#exportForm").on("submit", function() {
-                let filtered = [];
-
-                $("#dynamicTable tbody tr.data-row").each(function() {
-                    // Only collect rows that are currently visible (filtered by search)
-                    if ($(this).css('display') !== 'none') {
-                        let rowData = {};
-
-                        $(this).find("input").each(function() {
-                            rowData[$(this).attr("name")] = $(this).val();
-                        });
-
-                        if (rowData.row_id) { 
-                            filtered.push(rowData);
-                        }
-                    }
-                });
-
-                $("#filtered_rows").val(JSON.stringify(filtered));
-            });
         });
     </script>
-    {% endblock %}
+{% endblock %}
